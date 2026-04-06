@@ -1,170 +1,68 @@
 import os
 import re
 
-MOVIE_FOLDER = r"F:\Shows"
+TV_FOLDER = r"F:\TV Shows"
 OUTPUT_FILE = "index.html"
 
-def get_movies(folder):
-    movies = []
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            if file.lower().endswith((".mp4", ".mkv", ".avi", ".mov")):
-                movies.append(file)
-    return sorted(movies)
+def normalize_season_name(name):
+    """Turn folder names like 'S01', 'Season 1', '1' into 'Season 1'"""
+    match = re.search(r'(\d+)', name)
+    if match:
+        return f"Season {int(match.group(1))}"
+    return name
 
-def extract_year(name):
-    match = re.search(r"(19|20)\d{2}", name)
-    return match.group(0) if match else "Unknown"
+def get_shows(folder):
+    shows = {}
+    for show_name in os.listdir(folder):
+        show_path = os.path.join(folder, show_name)
+        if os.path.isdir(show_path):
+            seasons = []
+            for item in os.listdir(show_path):
+                item_path = os.path.join(show_path, item)
+                if os.path.isdir(item_path):
+                    seasons.append(normalize_season_name(item))
+            # If no season folders, but episodes exist, call it Season 1
+            if not seasons:
+                episodes = [f for f in os.listdir(show_path)
+                            if f.lower().endswith(('.mkv', '.mp4', '.avi', '.mov'))]
+                if episodes:
+                    seasons.append("Season 1")
+            shows[show_name] = sorted(seasons)
+    return dict(sorted(shows.items()))
 
-def guess_genre(name):
-    name = name.lower()
-    if "action" in name: return "Action"
-    if "comedy" in name: return "Comedy"
-    if "horror" in name: return "Horror"
-    if "sci" in name or "space" in name: return "Sci-Fi"
-    if "romance" in name: return "Romance"
-    return "Other"
-
-def generate_html(movies):
-    movie_items = ""
-
-    for movie in movies:
-        clean_name = os.path.splitext(movie)[0].replace(".", " ")
-        year = extract_year(clean_name)
-        genre = guess_genre(clean_name)
-        rating = "⭐⭐⭐☆☆"  # placeholder
-
-        movie_items += f"""
-        <div class="movie-row" data-title="{clean_name.lower()}" data-genre="{genre}">
-            <div class="title">{clean_name}</div>
-            <div class="meta">{year} • {genre}</div>
-            <div class="rating">{rating}</div>
+def generate_html(shows):
+    html = """
+    <html>
+    <head>
+        <title>My TV Shows</title>
+        <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+            h1 { text-align: center; }
+            ul { list-style-type: none; padding-left: 0; }
+            li { padding: 8px 0; border-bottom: 1px solid #ddd; }
+            strong { color: #333; }
+            @media (max-width: 600px) { body { padding: 10px; } }
+        </style>
+    </head>
+    <body>
+        <div style="text-align:center; margin-bottom:15px;">
+            <a href="https://wandavision1984.github.io/movie-list/">🎬 Movies</a> |
+            <a href="https://wandavision1984.github.io/tv-list/">📺 TV Shows</a>
         </div>
-        """
+        <h1>📺 My TV Shows</h1>
+        <ul>
+    """
 
-    return f"""
-<!DOCTYPE html>
-<html>
-<head>
-<title>My Movie Collection</title>
+    for show, seasons in shows.items():
+        html += f"<li><strong>{show}</strong>: {', '.join(seasons)}</li>"
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    html += "</ul></body></html>"
+    return html
 
-<style>
-body {{
-    font-family: Arial, sans-serif;
-    background: #121212;
-    color: white;
-    margin: 0;
-    padding: 15px;
-}}
-
-h1 {{
-    text-align: center;
-}}
-
-.controls {{
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 20px;
-}}
-
-input, select {{
-    padding: 10px;
-    border-radius: 8px;
-    border: none;
-    font-size: 14px;
-}}
-
-.movie-row {{
-    background: #1e1e1e;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    transition: 0.2s;
-}}
-
-.movie-row:hover {{
-    background: #2a2a2a;
-}}
-
-.title {{
-    font-size: 16px;
-    font-weight: bold;
-}}
-
-.meta {{
-    font-size: 13px;
-    color: #aaa;
-}}
-
-.rating {{
-    margin-top: 5px;
-}}
-
-@media (min-width: 600px) {{
-    .controls {{
-        flex-direction: row;
-    }}
-}}
-</style>
-</head>
-
-<body>
-
-<h1>🎬 My Movie Collection</h1>
-
-<div class="controls">
-    <input type="text" id="search" placeholder="Search movies...">
-    
-    <select id="genreFilter">
-        <option value="All">All Genres</option>
-        <option>Action</option>
-        <option>Comedy</option>
-        <option>Horror</option>
-        <option>Sci-Fi</option>
-        <option>Romance</option>
-        <option>Other</option>
-    </select>
-</div>
-
-<div id="movieList">
-{movie_items}
-</div>
-
-<script>
-const searchInput = document.getElementById("search");
-const genreFilter = document.getElementById("genreFilter");
-const movies = document.querySelectorAll(".movie-row");
-
-function filterMovies() {{
-    const search = searchInput.value.toLowerCase();
-    const genre = genreFilter.value;
-
-    movies.forEach(movie => {{
-        const title = movie.getAttribute("data-title");
-        const movieGenre = movie.getAttribute("data-genre");
-
-        const matchesSearch = title.includes(search);
-        const matchesGenre = genre === "All" || movieGenre === genre;
-
-        movie.style.display = (matchesSearch && matchesGenre) ? "block" : "none";
-    }});
-}}
-
-searchInput.addEventListener("input", filterMovies);
-genreFilter.addEventListener("change", filterMovies);
-</script>
-
-</body>
-</html>
-"""
-
-movies = get_movies(MOVIE_FOLDER)
-html = generate_html(movies)
+shows = get_shows(TV_FOLDER)
+html = generate_html(shows)
 
 with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
     f.write(html)
 
-print(f"Done! {len(movies)} movies listed.")
+print(f"Done! {len(shows)} shows listed.")
