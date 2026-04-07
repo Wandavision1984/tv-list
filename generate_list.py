@@ -1,7 +1,7 @@
 import os
 import re
 
-TV_FOLDER = r"F:\TV Shows"
+TV_FOLDER = r"F:\Shows"
 OUTPUT_FILE = "index.html"
 
 def normalize_season_name(name):
